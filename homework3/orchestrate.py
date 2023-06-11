@@ -11,6 +11,10 @@ import xgboost as xgb
 from prefect import flow, task
 from prefect.artifacts import create_markdown_artifact
 from datetime import datetime
+from prefect_email import email_send_message
+
+from prefect_email import EmailServerCredentials
+
 
 
 @task(retries=3, retry_delay_seconds=2)
@@ -63,6 +67,14 @@ def add_features(
     y_val = df_val["duration"].values
     return X_train, X_val, y_train, y_val, dv
 
+def notify_exc_by_email(rmse):
+    credentials = EmailServerCredentials.load("mails")
+    email_send_message(
+            email_server_credentials=credentials,
+            subject=f"Flow run succeded",
+            msg=f"Flow run {datetime.now()} metric{rmse}.",
+            email_to='aykuroch@gmail.com',
+        )
 
 @task(log_prints=True)
 def train_best_model(
@@ -101,6 +113,7 @@ def train_best_model(
         y_pred = booster.predict(valid)
         rmse = mean_squared_error(y_val, y_pred, squared=False)
         mlflow.log_metric("rmse", rmse)
+        
 
         markdown_report = f"""
         # RMSE Report
@@ -110,7 +123,9 @@ def train_best_model(
         ({datetime.now()}: {rmse})
         
         """
-        create_markdown_artifact(markdown=markdown_report, key='rmse_report')
+        create_markdown_artifact(markdown=markdown_report, key='rmse-report')
+
+        
 
         pathlib.Path("models").mkdir(exist_ok=True)
         with open("models/preprocessor.b", "wb") as f_out:
@@ -118,7 +133,7 @@ def train_best_model(
         mlflow.log_artifact("models/preprocessor.b", artifact_path="preprocessor")
 
         mlflow.xgboost.log_model(booster, artifact_path="models_mlflow")
-    return None
+    return rmse
 
 
 @flow
@@ -129,7 +144,7 @@ def main_flow(
     """The main training pipeline"""
 
     # MLflow settings
-    mlflow.set_tracking_uri("sqlite:///~/mlopszoomcamp/homework2/mlflow.db")
+    mlflow.set_tracking_uri("sqlite:///../mlflow.db")
     mlflow.set_experiment("nyc-taxi-experiment")
 
     # Load
@@ -140,7 +155,9 @@ def main_flow(
     X_train, X_val, y_train, y_val, dv = add_features(df_train, df_val)
 
     # Train
-    train_best_model(X_train, X_val, y_train, y_val, dv)
+    rmse = train_best_model(X_train, X_val, y_train, y_val, dv)
+    notify_exc_by_email(rmse)
+    
 
 
 if __name__ == "__main__":
