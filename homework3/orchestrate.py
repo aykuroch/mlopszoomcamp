@@ -9,12 +9,8 @@ from sklearn.metrics import mean_squared_error
 import mlflow
 import xgboost as xgb
 from prefect import flow, task
-from prefect.server.schemas.schedules import CronSchedule
 from prefect.artifacts import create_markdown_artifact
 from datetime import datetime
-
-
-schedule = CronSchedule('0 9 3 * *')
 
 
 @task(retries=3, retry_delay_seconds=2)
@@ -114,7 +110,7 @@ def train_best_model(
         ({datetime.now()}: {rmse})
         
         """
-        create_markdown_artifact(markdown_report, 'rmse_report')
+        create_markdown_artifact(markdown=markdown_report, key='rmse_report')
 
         pathlib.Path("models").mkdir(exist_ok=True)
         with open("models/preprocessor.b", "wb") as f_out:
