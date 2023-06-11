@@ -9,6 +9,12 @@ from sklearn.metrics import mean_squared_error
 import mlflow
 import xgboost as xgb
 from prefect import flow, task
+from prefect.server.schemas.schedules import CronSchedule
+from prefect.artifacts import create_markdown_artifact
+from datetime import datetime
+
+
+schedule = CronSchedule('0 9 3 * *')
 
 
 @task(retries=3, retry_delay_seconds=2)
@@ -100,6 +106,16 @@ def train_best_model(
         rmse = mean_squared_error(y_val, y_pred, squared=False)
         mlflow.log_metric("rmse", rmse)
 
+        markdown_report = f"""
+        # RMSE Report
+        
+        ## Time and value
+
+        ({datetime.now()}: {rmse})
+        
+        """
+        create_markdown_artifact(markdown_report, 'rmse_report')
+
         pathlib.Path("models").mkdir(exist_ok=True)
         with open("models/preprocessor.b", "wb") as f_out:
             pickle.dump(dv, f_out)
@@ -111,13 +127,13 @@ def train_best_model(
 
 @flow
 def main_flow(
-    train_path: str = "./data/green_tripdata_2021-01.parquet",
-    val_path: str = "./data/green_tripdata_2021-02.parquet",
+    train_path: str = "./data/green_tripdata_2023-01.parquet",
+    val_path: str = "./data/green_tripdata_2023-02.parquet",
 ) -> None:
     """The main training pipeline"""
 
     # MLflow settings
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_tracking_uri("sqlite:///~/mlopszoomcamp/homework2/mlflow.db")
     mlflow.set_experiment("nyc-taxi-experiment")
 
     # Load

@@ -15,4 +15,4 @@ pull:
 - prefect.projects.steps.git_clone_project:
     repository: https://github.com/aykuroch/mlopszoomcamp.git
     branch: master
-    access_token: null
+    access_token: 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
